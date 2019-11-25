@@ -85,10 +85,8 @@ def get_layers(net_params, layer_infos):
                     layer_info["batch_normalize"] == 1:
                 has_bn = True
                 bn = nn.BatchNorm2d(out_channels)
-                bias = False
             else:
                 has_bn = False
-                bias = True
 
             if pad:
                 padding = (kernel_size - 1) // 2
@@ -100,14 +98,14 @@ def get_layers(net_params, layer_infos):
                              kernel_size=kernel_size,
                              stride=stride,
                              padding=padding,
-                             bias=bias)
+                             bias=not has_bn)
 
             # Compose 3 layers into a Sequential()
             module.add_module(f"conv_{layer_idx}", conv)
-            if activation == "leaky":
-                module.add_module(f"leaky_{layer_idx}", nn.LeakyReLU(0.1))
             if has_bn:
                 module.add_module(f"batch_norm_{layer_idx}", bn)
+            if activation == "leaky":
+                module.add_module(f"leaky_{layer_idx}", nn.LeakyReLU(0.1))
 
         elif layer_type == "maxpool":
             kernel_size = layer_info["size"]
@@ -163,6 +161,8 @@ def get_layers(net_params, layer_infos):
                               YoloLayer(anchors=anchors,
                                         num_classes=num_classes,
                                         input_spatial_size=input_spatial_size))
+        else:
+            raise ValueError(f"Unknown block {layer_type}")
 
         layers_out_channels.append(out_channels)
         prev_channels = out_channels
