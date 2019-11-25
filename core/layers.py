@@ -42,19 +42,19 @@ class YoloLayer(nn.Module):
         preds[:, :, 5:] = torch.sigmoid(preds[:, :, 5:])  # Class scores
 
         # Calculate the absolute x,y of the bounding boxes by
-        # offseting top-left coords of corresponding grid
+        # offseting top-left coords of corresponding grid cell
         grid = np.arange(grid_size)
         a, b = np.meshgrid(grid, grid)
-        x_offset = torch.FloatTensor(b).repeat_interleave(num_anchors)
-        y_offset = torch.FloatTensor(a).repeat_interleave(num_anchors)
-
+        x_offset = torch.FloatTensor(a).repeat_interleave(num_anchors)
+        y_offset = torch.FloatTensor(b).repeat_interleave(num_anchors)
         preds[:, :, :2] += torch.stack((x_offset, y_offset), axis=1)
-        # Multiply with strides to get correct coords with original image size
-        preds[:, :, :2] *= strides
 
         # Calculate width and height of bounding boxes
         anchors = torch.FloatTensor(self.anchors).repeat((grid_size ** 2, 1))
         preds[:, :, 2:4] = anchors * torch.exp(preds[:, :, 2:4])
+
+        # Multiply with strides to get correct coords with original image size
+        preds[:, :, :2] *= strides
 
         return preds
 
@@ -78,17 +78,9 @@ def get_layers(net_params, layer_infos):
             out_channels = layer_info["filters"]
             kernel_size = layer_info["size"]
             stride = layer_info["stride"]
-            pad = layer_info["pad"]
             activation = layer_info["activation"]
 
-            if "batch_normalize" in layer_info and \
-                    layer_info["batch_normalize"] == 1:
-                has_bn = True
-                bn = nn.BatchNorm2d(out_channels)
-            else:
-                has_bn = False
-
-            if pad:
+            if layer_info["pad"]:
                 padding = (kernel_size - 1) // 2
             else:
                 padding = 0
@@ -98,31 +90,34 @@ def get_layers(net_params, layer_infos):
                              kernel_size=kernel_size,
                              stride=stride,
                              padding=padding,
-                             bias=not has_bn)
+                             bias=bool(not layer_info.get("batch_normalize")))
 
             # Compose 3 layers into a Sequential()
             module.add_module(f"conv_{layer_idx}", conv)
-            if has_bn:
-                module.add_module(f"batch_norm_{layer_idx}", bn)
+            if layer_info.get("batch_normalize"):
+                module.add_module(f"batch_norm_{layer_idx}",
+                                  nn.BatchNorm2d(out_channels))
             if activation == "leaky":
-                module.add_module(f"leaky_{layer_idx}", nn.LeakyReLU(0.1))
+                module.add_module(f"leaky_{layer_idx}",
+                                  nn.LeakyReLU(0.1, inplace=True))
 
         elif layer_type == "maxpool":
             kernel_size = layer_info["size"]
             stride = layer_info["stride"]
             # Strange paddings when stride is 1
-            if stride == 1:
+            if kernel_size == 2 and stride == 1:
                 module.add_module(f"padding_{layer_idx}",
                                   nn.ZeroPad2d((0, 1, 0, 1)))
             module.add_module(f"maxpool_{layer_idx}",
                               nn.MaxPool2d(kernel_size=kernel_size,
-                                           stride=stride))
+                                           stride=stride,
+                                           padding=int((kernel_size-1) // 2)))
 
         elif layer_type == "upsample":
             factor = layer_info["stride"]
             module.add_module(f"upsample_{layer_idx}",
                               nn.Upsample(scale_factor=factor,
-                                          mode='bilinear',
+                                          mode="bilinear",
                                           align_corners=False))
 
         elif layer_type == "route":

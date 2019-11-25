@@ -59,7 +59,7 @@ class Darknet(nn.Module):
         with open(weight_path) as f:
             header = np.fromfile(f, dtype=np.int32, count=5)
             weights = np.fromfile(f, dtype=np.float32)
-            print(len(weights))
+            print(f"Total weights in file: {len(weights)}")
 
         ptr = 0
         for i, layer in enumerate(self.module_list):
@@ -67,7 +67,7 @@ class Darknet(nn.Module):
             if layer_type == "convolutional":
                 conv = layer[0]
                 if "batch_normalize" in self.layer_infos[i]:
-                    bn = layer[-1]
+                    bn = layer[1]
                     # Copy the pretrained weights to model params
                     ptr = self.__load_params(bn.bias, weights, ptr)
                     ptr = self.__load_params(bn.weight, weights, ptr)
@@ -77,6 +77,7 @@ class Darknet(nn.Module):
                     ptr = self.__load_params(conv.bias, weights, ptr)
                 # Finally, load conv weights
                 ptr = self.__load_params(conv.weight, weights, ptr)
+        print(f"Total weights loaded: {ptr}")
 
     def __load_params(self, param_tensor, param_arr, ptr):
         # Get the number of elements in param_tensor
