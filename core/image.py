@@ -49,7 +49,8 @@ def get_colors(n):
 
 
 def draw_predictions(img, rects, rect_labels, scores,
-                     font_scale=0.55, title="predictions"):
+                     font_scale=0.6, title="predictions",
+                     save_path=None):
     res_img = img.copy()
     colors = get_colors(len(scores))
     for i, (rect, label) in enumerate(zip(rects, rect_labels)):
@@ -68,6 +69,10 @@ def draw_predictions(img, rects, rect_labels, scores,
                       (rect[2], rect[3]), colors[i], 2, cv2.LINE_AA)
 
     res_img = cv2.cvtColor(res_img, cv2.COLOR_RGB2BGR)
-    cv2.imshow(title, res_img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    if save_path:
+        print(f"Writing results to {save_path}")
+        cv2.imwrite(save_path, res_img)
+    else:
+        cv2.imshow(title, res_img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()

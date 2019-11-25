@@ -9,7 +9,7 @@ import torch
 from core.models import Darknet
 from core.utils import parse_darknet_cfg, non_max_surpression
 from core.image import (
-    draw_predictions, letterbox_image, scale_rects, get_colors
+    draw_predictions, letterbox_image, scale_rects
 )
 
 ap = argparse.ArgumentParser()
@@ -41,7 +41,6 @@ net_input = net_input.unsqueeze(0)
 with open("data/coco.names") as f:
     content = f.read().strip()
     coco_labels = content.split("\n")
-    colors = get_colors(len(coco_labels))
 
 # Inference
 start = time.time()
