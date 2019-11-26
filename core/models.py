@@ -110,5 +110,6 @@ class Darknet(nn.Module):
             net_output = self(net_input)
             rects, labels, scores = non_max_surpression(
                 net_output[0], conf_threshold=0.25, iou_threshold=0.4)
-            rects = scale_rects(rects, img.shape[:2], self.input_dim)
+            if len(rects) != 0:
+                rects = scale_rects(rects, img.shape[:2], self.input_dim)
         return rects, labels, scores

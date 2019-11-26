@@ -14,7 +14,8 @@ ap.add_argument("--img", required=True, help="Path to the input image")
 ap.add_argument("--cfg", required=True, help="Path to the model config file")
 ap.add_argument("-w", "--weights", required=True,
                 help="Path to the weights file")
-ap.add_argument("--output", help="Path to the output image")
+ap.add_argument("-s", "--save", action="store_true",
+                help="Save detection results to output folder")
 args = ap.parse_args()
 
 
@@ -36,12 +37,17 @@ start = time.time()
 rects, labels, scores = net.detect(img)
 print(f"Detection took {time.time() - start:.2f}s")
 
-labels = [coco_labels[i] for i in labels]
-res_img = draw_predictions(img, rects, labels, scores)
+if len(rects) > 0:
+    labels = [coco_labels[i] for i in labels]
+    res_img = draw_predictions(img, rects, labels, scores)
+else:
+    res_img = img
+res_img = cv2.cvtColor(res_img, cv2.COLOR_RGB2BGR)
 
-if args.output:
-    print(f"Writing results to {args.output}")
-    cv2.imwrite(args.output, res_img)
+if args.save:
+    output_path = f"output/detections.jpg"
+    print(f"Writing results to {output_path}")
+    cv2.imwrite(output_path, res_img)
 else:
     cv2.imshow(args.img, res_img)
     cv2.waitKey(0)

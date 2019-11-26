@@ -69,5 +69,4 @@ def draw_predictions(img, rects, rect_labels, scores,
         cv2.rectangle(res_img, (rect[0], rect[1]),
                       (rect[2], rect[3]), colors[i], 2, cv2.LINE_AA)
 
-    res_img = cv2.cvtColor(res_img, cv2.COLOR_RGB2BGR)
     return res_img
