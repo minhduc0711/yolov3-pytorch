@@ -4,18 +4,20 @@ import cv2
 import matplotlib.pyplot as plt
 
 
-def letterbox_image(image, size):
-    '''resize image with unchanged aspect ratio using padding'''
-    iw, ih = image.size
+def letterbox_image(img, size):
+    if isinstance(img, np.ndarray):
+        img = Image.fromarray(img)
+    # resize image with unchanged aspect ratio using padding
+    iw, ih = img.size
     w, h = size
     scale = min(w/iw, h/ih)
     nw = int(iw*scale)
     nh = int(ih*scale)
 
-    image = image.resize((nw, nh), Image.BICUBIC)
-    new_image = Image.new('RGB', size, (128, 128, 128))
-    new_image.paste(image, ((w-nw)//2, (h-nh)//2))
-    return np.array(new_image, np.uint8)
+    img = img.resize((nw, nh), Image.BICUBIC)
+    new_img = Image.new('RGB', size, (128, 128, 128))
+    new_img.paste(img, ((w-nw)//2, (h-nh)//2))
+    return np.array(new_img, np.uint8)
 
 
 def scale_rects(boxes, original_size, input_size):
@@ -49,8 +51,7 @@ def get_colors(n):
 
 
 def draw_predictions(img, rects, rect_labels, scores,
-                     font_scale=0.6, title="predictions",
-                     save_path=None):
+                     font_scale=0.6):
     res_img = img.copy()
     colors = get_colors(len(scores))
     for i, (rect, label) in enumerate(zip(rects, rect_labels)):
@@ -69,10 +70,4 @@ def draw_predictions(img, rects, rect_labels, scores,
                       (rect[2], rect[3]), colors[i], 2, cv2.LINE_AA)
 
     res_img = cv2.cvtColor(res_img, cv2.COLOR_RGB2BGR)
-    if save_path:
-        print(f"Writing results to {save_path}")
-        cv2.imwrite(save_path, res_img)
-    else:
-        cv2.imshow(title, res_img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+    return res_img

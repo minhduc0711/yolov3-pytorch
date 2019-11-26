@@ -3,13 +3,16 @@ import torch
 from torch import nn
 
 from core.layers import get_layers
+from core.image import letterbox_image, scale_rects
+from core.utils import non_max_surpression, parse_darknet_cfg
 
 
 class Darknet(nn.Module):
-    def __init__(self, net_params, layer_infos):
+    def __init__(self, cfg_path):
         super(Darknet, self).__init__()
-        self.layer_infos = layer_infos
-        self.module_list = get_layers(net_params, layer_infos)
+        self.net_params, self.layer_infos = parse_darknet_cfg(cfg_path)
+        self.input_dim = self.net_params["height"], self.net_params["width"]
+        self.module_list = get_layers(self.net_params, self.layer_infos)
 
     def forward(self, x):
         detections = None
@@ -89,3 +92,23 @@ class Darknet(nn.Module):
         param_tensor.data.copy_(params)
         # Return increased ptr
         return ptr + num_params
+
+    def prepare_yolo_input(self, img, input_dim):
+        # Pad & resize
+        resized_img = letterbox_image(img, input_dim)
+        img = np.array(img)
+        net_input = torch.from_numpy(np.transpose(
+            resized_img, [2, 0, 1])).type(torch.float32)
+        net_input /= 255.
+        net_input = net_input.unsqueeze(0)
+        return net_input
+
+    def detect(self, img):
+        net_input = self.prepare_yolo_input(img, self.input_dim)
+        with torch.no_grad():
+            self.eval()
+            net_output = self(net_input)
+            rects, labels, scores = non_max_surpression(
+                net_output[0], conf_threshold=0.25, iou_threshold=0.4)
+            rects = scale_rects(rects, img.shape[:2], self.input_dim)
+        return rects, labels, scores
