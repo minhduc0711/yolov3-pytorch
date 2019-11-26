@@ -6,4 +6,4 @@ Followed [this series](https://blog.paperspace.com/how-to-implement-a-yolo-objec
 ## Usage
 `python detect.py img_path cfg_path weights_path`
 
-![YOLO predictions](output/safari.jpg)
+<img src="output/safari.jpg" alt-text="YOLO predictions" width=400px/>
