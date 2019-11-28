@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import torch
 from torch import nn
@@ -107,11 +109,17 @@ class Darknet(nn.Module):
         net_input = self.prepare_yolo_input(img, self.input_dim)
         with torch.no_grad():
             self.eval()
+            start = time.time()
             net_output = self(net_input)
+            # print(f"Forward pass: {time.time() - start:.4f}")
+
+            start = time.time()
             rects, labels, scores = non_max_surpression(
                 net_output[0],
                 conf_threshold=conf_threshold,
                 iou_threshold=iou_threshold)
+            # print(f"NMS: {time.time() - start:.4f}")
+
             if len(rects) != 0:
                 rects = scale_rects(rects, img.shape[:2], self.input_dim)
         return rects, labels, scores

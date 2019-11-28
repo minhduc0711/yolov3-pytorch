@@ -1,3 +1,4 @@
+import time
 import argparse
 from tqdm import tqdm
 
@@ -39,6 +40,7 @@ with open("data/coco.names") as f:
 
 print("Detecting...")
 while True:
+    start = time.time()
     ret, frame = cap.read()
     if not ret:
         break
@@ -51,6 +53,10 @@ while True:
     res_img = cv2.cvtColor(res_img, cv2.COLOR_RGB2BGR)
 
     if is_webcam:
+        fps = 1. / (time.time() - start)
+        cv2.putText(res_img, f"FPS: {fps:.2f}", (0, 20),
+                    cv2.FONT_HERSHEY_TRIPLEX, 0.5, (0, 0, 0),
+                    lineType=cv2.LINE_AA)
         cv2.imshow("real time YOLOv3", res_img)
         if cv2.waitKey(1) == ord('q'):
             break
@@ -61,8 +67,8 @@ while True:
         writer.write(res_img)
         pbar.update(1)
 
-pbar.close()
 if writer is not None:
+    pbar.close()
     writer.release()
     print(f"Output video saved to {output_path}")
 cap.release()
