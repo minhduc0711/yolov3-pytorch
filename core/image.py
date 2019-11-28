@@ -36,7 +36,7 @@ def scale_rects(boxes, original_size, input_size):
     boxes[:, 1] = (boxes[:, 1] - pad_h // 2) / unpad_h * oh
     boxes[:, 2] = (boxes[:, 2] - pad_w // 2) / unpad_w * ow
     boxes[:, 3] = (boxes[:, 3] - pad_h // 2) / unpad_h * oh
-    return boxes.astype(np.int)
+    return np.array(boxes, dtype=np.int)
 
 
 def get_colors(n):
@@ -50,23 +50,25 @@ def get_colors(n):
     return colors[:n]
 
 
-def draw_predictions(img, rects, rect_labels, scores,
-                     font_scale=0.6):
+def draw_predictions(img, rects, rect_labels, scores, label_list,
+                     text_scale=.02, rect_thickness=2):
+    font_scale = img.shape[0] / (25/text_scale)
     res_img = img.copy()
-    colors = get_colors(len(scores))
+    colors = get_colors(len(label_list))
     for i, (rect, label) in enumerate(zip(rects, rect_labels)):
         # Draw labels
-        text = f"{label}: {scores[i]:.2f}"
+        text = f"{label_list[label]}: {scores[i]:.2f}"
         (text_width, text_height), _ = cv2.getTextSize(
-            text, cv2.FONT_HERSHEY_TRIPLEX, font_scale, 2)
+            text, cv2.FONT_HERSHEY_TRIPLEX, font_scale, 1)
         cv2.rectangle(res_img,
                       (rect[0], rect[1] - 10 - text_height),
                       (rect[0] + text_width, rect[1]),
-                      colors[i], thickness=cv2.FILLED)
+                      colors[label], thickness=cv2.FILLED)
         cv2.putText(res_img, text, (rect[0], rect[1]-10),
-                    cv2.FONT_HERSHEY_TRIPLEX, font_scale, (0, 0, 0))
+                    cv2.FONT_HERSHEY_TRIPLEX, font_scale, (0, 0, 0),
+                    lineType=cv2.LINE_AA, thickness=1)
         # Draw bounding box
-        cv2.rectangle(res_img, (rect[0], rect[1]),
-                      (rect[2], rect[3]), colors[i], 2, cv2.LINE_AA)
+        cv2.rectangle(res_img, (rect[0], rect[1]), (rect[2], rect[3]),
+                      colors[label], rect_thickness, cv2.LINE_AA)
 
     return res_img

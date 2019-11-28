@@ -1,4 +1,4 @@
-import numpy as np
+import torch
 
 
 def cast_to_number(x):
@@ -93,7 +93,7 @@ def get_iou(bb1, bb2):
 
 
 def xywh2xyxy(rects):
-    new_rects = np.zeros_like(rects)
+    new_rects = torch.zeros_like(rects)
 
     new_rects[:, 0] = rects[:, 0] - rects[:, 2] / 2
     new_rects[:, 1] = rects[:, 1] - rects[:, 3] / 2
@@ -104,26 +104,25 @@ def xywh2xyxy(rects):
 
 
 def non_max_surpression(preds, conf_threshold=0.25, iou_threshold=0.4):
-    if not isinstance(preds, np.ndarray):
-        preds = np.array(preds)
-
     # Remove boxes with low confidence score
-    idxs = np.where(preds[:, 4] > conf_threshold)[0]
+    idxs = torch.where(preds[:, 4] > conf_threshold)[0]
     preds = preds[idxs, :]
 
-    final_rects = []
-    final_labels = []
-    final_scores = []
+    if len(preds) == 0:
+        return [], [], []
+
+    final_rects, final_labels, final_scores = [], [], []
+
     preds[:, :4] = xywh2xyxy(preds[:, :4])
-    preds_labels = np.argmax(preds[:, 5:], axis=1)
+    preds_labels = torch.argmax(preds[:, 5:], dim=1)
     # Process boxes of each separate classes to remove redundant ones
-    for label in np.unique(preds_labels):
+    for label in torch.unique(preds_labels):
         same_class_rects = preds[preds_labels == label, :4]
         # Calculate P(class) = P(class|object) * P(object)
         same_class_scores = preds[preds_labels == label, 4] * \
             preds[preds_labels == label, 5 + label]
         # Sort the rects by scores descending
-        sorted_idxs = np.flip(np.argsort(same_class_scores))
+        sorted_idxs = torch.argsort(same_class_scores, descending=True)
         same_class_rects = same_class_rects[sorted_idxs, :]
         same_class_scores = same_class_scores[sorted_idxs]
 
@@ -132,15 +131,15 @@ def non_max_surpression(preds, conf_threshold=0.25, iou_threshold=0.4):
         i = 0
         while i < same_class_rects.shape[0]:
             current_rect = same_class_rects[i]
-            del_idxs = []  # Keep indices of boxes that will be removed
+            keep_idxs = list(range(i + 1))
             # Loop through all other boxes and find big IOU
             for j in range(i + 1, same_class_rects.shape[0]):
                 other_rect = same_class_rects[j]
-                if get_iou(current_rect, other_rect) > iou_threshold:
-                    del_idxs.append(j)
+                if get_iou(current_rect, other_rect) < iou_threshold:
+                    keep_idxs.append(j)
             # Remove the redundant boxes and their corresponding scores
-            same_class_rects = np.delete(same_class_rects, del_idxs, axis=0)
-            same_class_scores = np.delete(same_class_scores, del_idxs, axis=0)
+            same_class_rects = same_class_rects[keep_idxs, :]
+            same_class_scores = same_class_scores[keep_idxs]
 
             i += 1
         # Add the surviving boxes to the final predictions
@@ -148,4 +147,5 @@ def non_max_surpression(preds, conf_threshold=0.25, iou_threshold=0.4):
         final_scores.extend(same_class_scores)
         final_labels.extend([label] * same_class_rects.shape[0])
 
-    return np.array(final_rects), final_labels, final_scores
+    final_rects = torch.stack(final_rects)
+    return final_rects, final_labels, final_scores

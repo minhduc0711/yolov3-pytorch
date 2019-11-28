@@ -38,8 +38,7 @@ rects, labels, scores = net.detect(img)
 print(f"Detection took {time.time() - start:.2f}s")
 
 if len(rects) > 0:
-    labels = [coco_labels[i] for i in labels]
-    res_img = draw_predictions(img, rects, labels, scores)
+    res_img = draw_predictions(img, rects, labels, scores, coco_labels)
 else:
     res_img = img
 res_img = cv2.cvtColor(res_img, cv2.COLOR_RGB2BGR)

@@ -1,5 +1,3 @@
-import numpy as np
-
 import torch
 from torch import nn
 
@@ -18,6 +16,17 @@ class YoloLayer(nn.Module):
         self.num_classes = num_classes
         self.input_spatial_size = input_spatial_size
 
+    def compute_grid(self, grid_size, num_anchors):
+        idxs = torch.arange(grid_size, dtype=torch.float)
+        x_offset, y_offset = torch.meshgrid(idxs, idxs)
+        # The xy coords of images is inverted
+        x_grid = torch.repeat_interleave(y_offset.unsqueeze(-1), 3, dim=2)
+        y_grid = torch.repeat_interleave(x_offset.unsqueeze(-1), 3, dim=2)
+        self.x_grid = x_grid.view(1, grid_size, grid_size, num_anchors)
+        self.y_grid = y_grid.view(1, grid_size, grid_size, num_anchors)
+        self._anchors = torch.Tensor(
+            self.anchors).view(1, 1, 1, num_anchors, 2)
+
     def forward(self, inputs):
         batch_size = inputs.shape[0]
         grid_size = inputs.shape[2]
@@ -25,38 +34,33 @@ class YoloLayer(nn.Module):
         num_anchors = len(self.anchors)
         num_bbox_attrs = self.num_classes + 5
 
-        # Transform the prediction tensor shape
-        preds = inputs.view(batch_size, num_anchors,
-                            num_bbox_attrs, grid_size ** 2)
-        # Becomes (bs, anchors, gs * gs, bbox_attrs)
-        preds = preds.transpose(2, 3).contiguous()
-        # Becomes (bs, gs * gs, anchors, bbox_attrs)
-        preds = preds.transpose(1, 2).contiguous()
-        preds = preds.view(batch_size, grid_size *
-                           grid_size * num_anchors, num_bbox_attrs)
+        # Permute the preds tensor dims
+        # from (batch_size, num_anchors, num_box_attrs, grid_size, grid_size)
+        # to   (batch_size, grid_size, grid_size, num_anchors, num_box_attrs)
+        preds = inputs.reshape(batch_size, num_anchors,
+                               num_bbox_attrs, grid_size, grid_size)
+        preds = preds.permute([0, 3, 4, 1, 2])
 
         # Apply sigmoid to tx, ty, confidence score and class scores
-        preds[:, :, 0] = torch.sigmoid(preds[:, :, 0])  # tx
-        preds[:, :, 1] = torch.sigmoid(preds[:, :, 1])  # ty
-        preds[:, :, 4] = torch.sigmoid(preds[:, :, 4])  # Objectness score
-        preds[:, :, 5:] = torch.sigmoid(preds[:, :, 5:])  # Class scores
+        preds[..., 0] = torch.sigmoid(preds[..., 0])  # tx
+        preds[..., 1] = torch.sigmoid(preds[..., 1])  # ty
+        preds[..., 4] = torch.sigmoid(preds[..., 4])  # Objectness score
+        preds[..., 5:] = torch.sigmoid(preds[..., 5:])  # Class scores
 
         # Calculate the absolute x,y of the bounding boxes by
         # offseting top-left coords of corresponding grid cell
-        grid = np.arange(grid_size)
-        a, b = np.meshgrid(grid, grid)
-        x_offset = torch.FloatTensor(a).repeat_interleave(num_anchors)
-        y_offset = torch.FloatTensor(b).repeat_interleave(num_anchors)
-        preds[:, :, :2] += torch.stack((x_offset, y_offset), axis=1)
+        self.compute_grid(grid_size, num_anchors)
+        preds[..., 0] += self.x_grid
+        preds[..., 1] += self.y_grid
 
         # Calculate width and height of bounding boxes
-        anchors = torch.FloatTensor(self.anchors).repeat((grid_size ** 2, 1))
-        preds[:, :, 2:4] = anchors * torch.exp(preds[:, :, 2:4])
+        preds[..., 2:4] = self._anchors * torch.exp(preds[..., 2:4])
 
         # Multiply with strides to get correct coords with original image size
-        preds[:, :, :2] *= strides
+        preds[..., :2] *= strides
 
-        return preds
+        return preds.reshape(batch_size, grid_size * grid_size * num_anchors,
+                             num_bbox_attrs)
 
 
 class EmptyLayer(nn.Module):

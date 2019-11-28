@@ -103,13 +103,15 @@ class Darknet(nn.Module):
         net_input = net_input.unsqueeze(0)
         return net_input
 
-    def detect(self, img):
+    def detect(self, img, conf_threshold=0.25, iou_threshold=0.4):
         net_input = self.prepare_yolo_input(img, self.input_dim)
         with torch.no_grad():
             self.eval()
             net_output = self(net_input)
             rects, labels, scores = non_max_surpression(
-                net_output[0], conf_threshold=0.25, iou_threshold=0.4)
+                net_output[0],
+                conf_threshold=conf_threshold,
+                iou_threshold=iou_threshold)
             if len(rects) != 0:
                 rects = scale_rects(rects, img.shape[:2], self.input_dim)
         return rects, labels, scores
